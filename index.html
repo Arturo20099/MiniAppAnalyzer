@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Analizador de Estadísticas</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; text-align: center; background-color: #f0f2f5; color: #333; }
+        h2 { color: #1a1a1a; }
+        button {
+            background-color: #0088cc;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        button:hover { background-color: #006699; }
+        #resultados {
+            text-align: left;
+            margin-top: 20px;
+            border-top: 2px solid #ccc;
+            padding-top: 20px;
+            font-size: 14px;
+        }
+        #loading {
+            display: none;
+            margin-top: 20px;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <h2>Analizador de Mensajes</h2>
+    <button onclick="obtenerEstadisticas()">Ver Estadísticas</button>
+    <div id="loading">Cargando mensajes...</div>
+    <div id="resultados">
+        <p>Presiona el botón para cargar las estadísticas de tu grupo.</p>
+    </div>
+    
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script>
+        const resultadosDiv = document.getElementById('resultados');
+        const loadingDiv = document.getElementById('loading');
+
+        function procesarMensaje(mensajeCompleto) {
+            const data = {};
+            const lineas = mensajeCompleto.split('\n');
+            lineas.forEach(linea => {
+                if (linea.startsWith("📲 Dispositivo:")) data.dispositivo = linea.replace("📲 Dispositivo:", "").trim();
+                else if (linea.startsWith("📐 Resolución:")) data.resolucion = linea.replace("📐 Resolución:", "").trim();
+                else if (linea.startsWith("📏 Tamaño:")) data.tamano = parseFloat(linea.replace("📏 Tamaño:", "").replace(" pulgadas", "").trim());
+                else if (linea.startsWith("🎯 DPI:")) data.dpi = parseInt(linea.replace("🎯 DPI:", "").trim());
+                else if (linea.startsWith("📦 Forro:")) data.forro = linea.replace("📦 Forro:", "").trim();
+                else if (linea.startsWith("🧤 Pulgar:")) data.pulgar = linea.replace("🧤 Pulgar:", "").trim();
+                else if (linea.startsWith("📌 Posición mira:")) data.posicionMira = linea.replace("📌 Posición mira:", "").trim();
+                else if (linea.startsWith("🎮 Sensibilidad General:")) data.sensibilidadGeneral = parseInt(linea.replace("🎮 Sensibilidad General:", "").trim());
+                else if (linea.startsWith("🔴 Punto Rojo:")) data.puntoRojo = parseInt(linea.replace("🔴 Punto Rojo:", "").trim());
+                else if (linea.startsWith("🔍 Mira 2x:")) data.mira2x = parseInt(linea.replace("🔍 Mira 2x:", "").trim());
+                else if (linea.startsWith("🔭 Mira 4x:")) data.mira4x = parseInt(linea.replace("🔭 Mira 4x:", "").trim());
+                else if (linea.startsWith("🎯 Botón de disparo:")) data.botonDisparo = linea.replace("🎯 Botón de disparo:", "").trim();
+                else if (linea.startsWith("📊 Resultado:")) data.resultadoPx = parseInt(linea.replace("📊 Resultado:", "").replace(" px", "").trim());
+            });
+            return data;
+        }
+
+        async function obtenerEstadisticas() {
+            loadingDiv.style.display = 'block';
+            resultadosDiv.innerHTML = '';
+
+            const BOT_TOKEN = "8467185549:AAFRmxNJOU8EtVmuhjJdzrm6X8FN384L9UE";
+            const CHAT_ID = -1002713969911;          
+
+            try {
+                const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getUpdates?limit=100`);
+                const json = await response.json();
+
+                if (json.ok && json.result.length > 0) {
+                    let totalSensibilidad = 0;
+                    let count = 0;
+                    let mensajesEncontrados = '';
+
+                    json.result.forEach(update => {
+                        if (update.message && update.message.chat.id == CHAT_ID) {
+                            if (update.message.text) {
+                                const textoMensaje = update.message.text;
+                                if (textoMensaje.includes("📲 Dispositivo:")) {
+                                    const datos = procesarMensaje(textoMensaje);
+                                    if (datos.sensibilidadGeneral) {
+                                        totalSensibilidad += datos.sensibilidadGeneral;
+                                        count++;
+                                    }
+                                    mensajesEncontrados += `<p><strong>Mensaje #${count}:</strong> ${datos.dispositivo} - Sensibilidad: ${datos.sensibilidadGeneral}</p>`;
+                                }
+                            }
+                        }
+                    });
+
+                    if (count > 0) {
+                        const promedioSensibilidad = (totalSensibilidad / count).toFixed(2);
+                        resultadosDiv.innerHTML = `
+                            <h3>Resumen de datos</h3>
+                            <p>Se encontraron <strong>${count}</strong> mensajes de estadísticas.</p>
+                            <p>Sensibilidad General promedio: <strong>${promedioSensibilidad}</strong></p>
+                            <hr>
+                            <h4>Mensajes detallados:</h4>
+                            ${mensajesEncontrados}
+                        `;
+                    } else {
+                        resultadosDiv.innerHTML = '<p>No se encontraron mensajes de estadísticas.</p>';
+                    }
+                } else {
+                    resultadosDiv.innerHTML = '<p>No se encontraron mensajes nuevos.</p>';
+                }
+
+            } catch (error) {
+                resultadosDiv.innerHTML = `<p style="color:red;">Error al conectar con la API: ${error.message}</p>`;
+            } finally {
+                loadingDiv.style.display = 'none';
+                Telegram.WebApp.ready();
+            }
+        }
+    </script>
+</body>
+</html>
